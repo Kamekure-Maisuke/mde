@@ -3,24 +3,45 @@ function isControlChar(charCode: number): boolean {
   return (charCode < 32) || (charCode === 127);
 }
 
+function editorRefreshScreen() {
+  // 画面クリア&カーソル左上
+  Deno.stdout.writeSync(new TextEncoder().encode("\x1b[2J"));
+  Deno.stdout.writeSync(new TextEncoder().encode("\x1b[H"));
+  // チルダ描画
+  editorDraw();
+  // カーソル左上
+  Deno.stdout.writeSync(new TextEncoder().encode("\x1b[H"));
+}
+
+function editorDraw() {
+  const { rows } = Deno.consoleSize();
+  const encoder = new TextEncoder();
+  for (let i = 0; i < rows; i++) {
+    Deno.stdout.writeSync(encoder.encode("~"));
+    if (i < rows - 1) {
+      Deno.stdout.writeSync(encoder.encode("\r\n"));
+    }
+  }
+}
+
 async function main(): Promise<number> {
   try {
     // 出力や文字列処理を無効化。
     Deno.stdin.setRaw(true);
 
-    // 案内
-    console.log("rawモード有効化");
-    console.log("キーを入力して。qで終了。。");
+    // 画面クリア
+    editorRefreshScreen();
 
-    const stdin = Deno.stdin;
     const buffer = new Uint8Array(1);
 
-    while (await stdin.read(buffer) !== null) {
+    keyLoop: while (await Deno.stdin.read(buffer) !== null) {
       const charCode = buffer[0];
 
-      // qを押したらプログラム終了。
-      if (charCode === 113) {
-        break;
+      // プログラム終了。
+      switch (charCode) {
+        case 27: // ESC
+        case 17: // CTRL-Q
+          break keyLoop;
       }
 
       if (isControlChar(charCode)) {
@@ -35,7 +56,7 @@ async function main(): Promise<number> {
     console.error(e);
     return 1;
   } finally {
-    // プログラム終了時はrawモードを解除。
+    editorRefreshScreen();
     Deno.stdin.setRaw(false);
   }
 }
